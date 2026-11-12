@@ -162,6 +162,71 @@ for i, scenario in enumerate([s for s in SCENARIOS if s["kind"] == "sns"], start
     scenario["comments"] = SNS_COMMENTS[f"sns_{i}"]
 
 
+SNS_ALL_NAMES = [
+    "김태린", "이서영", "박선유", "박경민", "이예나", "정하영", "유예나", "손예원",
+    "박수현", "곽이안", "김나윤", "안민영", "박효찬", "이진우", "신재민", "이시우",
+]
+SNS_EXTRA_COMMENTS = {
+    1: [
+        "계약 규모가 커 보여도 실제 이익으로 이어지는지 확인해야겠어.",
+        "수주 소식이 다른 관련 산업에도 영향을 줄 수 있겠다.",
+        "한 번의 뉴스보다 앞으로 추가 계약이 나오는지가 중요할 듯.",
+        "나는 주가가 이미 기대를 반영했는지도 살펴볼래.",
+        "장기적으로는 친환경 선박 기술 경쟁도 변수겠네.",
+        "결국 확인된 계약 내용과 시장 분위기를 같이 봐야지.",
+        "다들 너무 급하게 판단하지 말고 자료부터 확인하자.",
+        "온라인 반응이 뜨거워도 실제 실적은 따로 확인해야 해.",
+    ],
+    2: [
+        "공식 발표가 나오기 전에는 확정된 사실처럼 말하면 안 되겠어.",
+        "경영진 교체가 기술 개발 일정에 영향을 줄지도 궁금하네.",
+        "반도체는 고객사 주문과 생산 일정도 함께 봐야 해.",
+        "소문이 퍼질수록 출처 확인이 더 중요해지는 것 같아.",
+        "주가가 먼저 움직여도 나중에 사실과 다를 수 있지.",
+        "공시가 나오기 전까지는 관망하는 게 낫겠어.",
+        "한 가지 소식만으로 기업 전체를 판단하긴 어려워.",
+        "확인된 정보인지 추측인지 구분해서 읽어야겠어.",
+    ],
+    3: [
+        "조회수와 실제 구매 전환율은 다를 수 있다는 점도 봐야 해.",
+        "팬덤의 규모와 지속성이 기업 실적에 영향을 주겠지.",
+        "금융주는 금리뿐 아니라 대출 건전성도 중요해.",
+        "서로 다른 업종의 소식이라 각각 따로 분석해야겠어.",
+        "기대감이 이미 주가에 반영됐을 가능성도 있겠다.",
+        "공식 데뷔 일정과 콘텐츠 반응을 더 지켜보자.",
+        "소문만으로 금융주 전체가 움직인다고 보기는 어렵지.",
+        "투자할 때는 분위기보다 근거를 우선해야겠어.",
+    ],
+    4: [
+        "지원 정책의 대상과 규모가 구체적으로 공개됐는지 확인하자.",
+        "정책 기대감이 실제 매출로 이어지는 데는 시간이 걸릴 거야.",
+        "원재료 가격과 생산비도 같이 살펴봐야겠네.",
+        "정부 발표 자료가 나오면 내용을 비교해 봐야겠어.",
+        "특정 기업만 혜택을 받는 건지도 중요한 부분이야.",
+        "기대감만으로 오른 주가는 변동성이 클 수 있어.",
+        "기술 경쟁력과 시장 수요도 함께 따져보자.",
+        "확인 전까지는 가능성으로만 받아들이는 게 좋겠어.",
+    ],
+}
+for sns_index, scenario in enumerate([x for x in SCENARIOS if x["kind"] == "sns"], start=1):
+    existing = _existing = list(scenario.get("comments", []))
+    used = {str(item[0]) for item in existing if isinstance(item, (tuple, list)) and len(item) >= 2}
+    extras = iter(SNS_EXTRA_COMMENTS[sns_index])
+    for name in SNS_ALL_NAMES:
+        if name not in used:
+            existing.append((name, next(extras)))
+    scenario["comments"] = existing
+
+
+
+
+# 헤드라인 기사 분량 보강
+HEADLINE_ADDITIONS = {'정부, 대규모 선박 수주 확정 발표': '업계 관계자들은 수주 잔량이 안정적으로 유지될 경우 협력업체와 기자재 업체에도 일정 부분 파급 효과가 나타날 수 있다고 설명했다. 다만 계약 이행 과정에서 공정 지연이나 원가 상승이 발생하면 예상했던 수익성이 낮아질 수 있어, 향후 분기별 실적과 납기 관리 능력이 중요하다는 평가다.', '글로벌 AI 기업, 국내 반도체 업체에 HBM 대량 주문': '전문가들은 AI 반도체 시장의 성장 가능성이 크더라도 공급 업체 간 기술 경쟁이 심화되고 있다는 점을 주의해야 한다고 강조했다. 주문 증가가 지속적인 실적 개선으로 이어지는지 판단하려면 실제 출하량과 평균 판매 가격, 생산 수율 등을 함께 확인할 필요가 있다.', '주요 수출국, 자동차 관세 대폭 인상 확정': '완성차 업계는 관세 부담을 줄이기 위해 현지 생산 비중을 조정하거나 차종별 가격 정책을 다시 검토할 가능성이 있다. 부품을 공급하는 협력업체 역시 수출 물량 변화의 영향을 받을 수 있어 업계 전반의 대응이 주목된다. 시장에서는 정책의 세부 내용과 기업별 대응 능력에 따라 주가 흐름이 달라질 수 있다고 보고 있다.', '중앙은행 기준금리 인상… 은행 예대마진 확대 전망': '은행별로 대출 구조와 예금 조달 비용이 다르기 때문에 금리 인상의 효과가 모든 금융회사에 동일하게 나타나는 것은 아니다. 금융권은 가계와 기업의 상환 부담이 커질 가능성에도 대비해야 하며, 투자자들은 순이자마진뿐 아니라 연체율과 충당금 규모 등 건전성 지표를 함께 살펴볼 필요가 있다.', '원자재 가격 폭락… 철강·화학 업계 비상': '업계에서는 원자재 가격 하락이 장기간 이어질 경우 제품 가격 협상력과 재고 관리 능력이 기업 실적을 가르는 요인이 될 것으로 보고 있다. 반대로 원료를 수입해 제품을 생산하는 일부 기업에는 비용 절감 기회가 될 수도 있다. 따라서 같은 소재 산업 안에서도 사업 구조에 따라 주가 영향이 다르게 나타날 수 있다는 분석이다.', '국내 아이돌 그룹, 빌보드 1위 달성': '업계 관계자들은 글로벌 차트 성과가 광고 계약과 해외 공연 기회 확대에 긍정적으로 작용할 수 있다고 설명했다. 다만 콘텐츠 제작비와 마케팅 비용, 아티스트 활동 일정에 따라 실제 수익 규모는 달라질 수 있다. 시장에서는 이번 성과가 단기 화제성에 그치지 않고 장기적인 팬덤 확대와 매출 증가로 연결될지 주목하고 있다.'}
+for _scenario in SCENARIOS:
+    if _scenario['kind'] == 'headline' and _scenario['title'] in HEADLINE_ADDITIONS:
+        _scenario['body'] += ' ' + HEADLINE_ADDITIONS[_scenario['title']]
+
+
 UP_REASONS = ["뚜렷한 이유 없이 매수세가 몰렸습니다.", "시장 분위기가 좋아지며 소폭 상승했습니다.",
               "큰 뉴스는 없었지만 투자자들의 기대감이 올랐습니다."]
 DOWN_REASONS = ["뚜렷한 이유 없이 차익 실현 매물이 나왔습니다.", "시장 분위기가 가라앉으며 소폭 하락했습니다.",
@@ -470,6 +535,35 @@ def fmt(n):
     return f"{n:,}원"
 
 
+def _normalise_comments(raw_comments):
+    """댓글 자료형이 튜플·리스트·딕셔너리·문자열 중 무엇이든 안전하게 표시합니다."""
+    if not raw_comments:
+        return []
+    if isinstance(raw_comments, dict):
+        raw_items = list(raw_comments.items())
+    elif isinstance(raw_comments, (list, tuple)):
+        raw_items = list(raw_comments)
+    else:
+        raw_items = [raw_comments]
+
+    normalised = []
+    for item in raw_items:
+        if isinstance(item, dict):
+            speaker = item.get("speaker") or item.get("name") or "누리꾼"
+            comment = item.get("comment") or item.get("text") or ""
+        elif isinstance(item, (list, tuple)):
+            if len(item) >= 2:
+                speaker, comment = item[0], item[1]
+            elif len(item) == 1:
+                speaker, comment = "누리꾼", item[0]
+            else:
+                continue
+        else:
+            speaker, comment = "누리꾼", item
+        normalised.append((str(speaker), str(comment)))
+    return normalised
+
+
 def newspaper(articles):
     """한 세트의 헤드라인·특보·SNS 대화를 신문 형태로 표시합니다."""
     labels = {
@@ -477,15 +571,27 @@ def newspaper(articles):
         "special": "📢 특보",
         "sns": "💬 SNS 누리꾼 대화",
     }
+    # 예전 방 데이터가 단일 기사 형태로 남아 있어도 오류 없이 표시합니다.
+    if isinstance(articles, dict):
+        articles = articles.get("articles") or [articles]
+    if not isinstance(articles, (list, tuple)):
+        st.warning("이번 라운드의 신문 데이터를 불러오지 못했습니다.")
+        return
+
     for scn in articles:
+        if not isinstance(scn, dict):
+            continue
+        kind = scn.get("kind", "headline")
         with st.container(border=True):
-            st.caption(labels[scn["kind"]])
-            st.markdown(f"### {scn['title']}")
-            st.write(scn["body"])
-            if scn["kind"] == "sns":
-                st.markdown("**댓글**")
-                for speaker, comment in scn.get("comments", []):
-                    st.markdown(f"**{speaker}**  {comment}")
+            st.caption(labels.get(kind, "📰 기사"))
+            st.markdown(f"### {scn.get('title', '시장 주요 소식')}")
+            st.write(scn.get("body", "기사 내용이 준비되지 않았습니다."))
+            if kind == "sns":
+                comments = _normalise_comments(scn.get("comments", []))
+                if comments:
+                    st.markdown("**SNS 댓글 대화**")
+                    for speaker, comment in comments:
+                        st.markdown(f"**{speaker}**  {comment}")
 
 
 def players_df(room, status, spectator_view=False):
@@ -522,18 +628,23 @@ def spectator_progress_df(room):
     ])
 
 
-def show_player_holdings(player):
-    """참가자 본인에게 보유 중인 종목만 표시합니다."""
-    owned = [
-        f"{STOCKS[key]['icon']} **{STOCKS[key]['name']}** · {qty}주"
-        for key, qty in player["holdings"].items() if qty > 0
-    ]
+def show_player_holdings(room, player):
+    """참가자 본인에게 보유 종목, 수량, 현재 단가와 평가 금액을 표시합니다."""
     st.markdown("#### 📦 내 보유 주식")
-    if owned:
-        for item in owned:
-            st.markdown(f"- {item}")
-    else:
+    owned = [(key, qty) for key, qty in player["holdings"].items() if qty > 0]
+    if not owned:
         st.caption("현재 보유 중인 주식이 없습니다.")
+        return
+    rows = []
+    for key, qty in owned:
+        price = room["prices"][key]
+        rows.append({
+            "종목": f"{STOCKS[key]['icon']} {STOCKS[key]['name']}",
+            "보유 수량": f"{qty}주",
+            "현재 주가": fmt(price),
+            "평가 금액": fmt(qty * price),
+        })
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
 def show_result(room):
@@ -615,6 +726,26 @@ def show_hints(room, p):
             st.markdown("**🔎 이번 라운드 힌트**")
             for hint in hints:
                 st.write("💡 " + hint)
+
+
+def show_host_round_preview(room):
+    """진행자에게만 현재 라운드에서 변동할 종목과 예상 방향을 미리 보여줍니다."""
+    current = room.get("current") or {}
+    changes = current.get("changes", {})
+    if not changes:
+        return
+    st.markdown("#### 🔐 진행자 전용 · 이번 라운드 주가 변동 미리보기")
+    rows = []
+    for key, change in changes.items():
+        pct, reason = change
+        rows.append({
+            "변동 종목": f"{STOCKS[key]['icon']} {STOCKS[key]['name']}",
+            "예상 방향": "📈 상승" if pct > 0 else "📉 하락",
+            "예상 변동률": f"{pct * 100:+.1f}%",
+            "변동 근거": reason,
+        })
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.caption("이 정보는 진행자 화면에만 표시되며 참가자와 관전자에게는 공개되지 않습니다.")
 
 
 def host_panel(room):
@@ -724,10 +855,12 @@ def live():
         if role in ("host", "spectator"):
             if status == "trading":
                 st.markdown("#### 이번 라운드 신문")
-                newspaper(room["current"]["articles"])
+                current = room.get("current") or {}
+                newspaper(current.get("articles") or current.get("sc") or [])
                 if role == "host":
                     done = sum(p["done"] for p in room["players"].values())
                     st.caption(f"거래 완료: {done} / {len(room['players'])}팀")
+                    show_host_round_preview(room)
             if status in ("result", "minigame"):
                 show_result(room)
             # 관전자는 매매 중 팀 이름과 거래 완료 여부만 확인할 수 있습니다.
@@ -742,7 +875,7 @@ def live():
                 )
         elif me:
             st.metric("보유 현금", fmt(me["cash"]))
-            show_player_holdings(me)
+            show_player_holdings(room, me)
             st.metric("총 자산", fmt(total_value(room, me)))
             show_hints(room, me)
             if status == "trading":
@@ -807,3 +940,4 @@ else:
 
     st.title("📈 주식 투자 게임")
     live()
+
