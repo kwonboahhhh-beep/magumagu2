@@ -8,6 +8,11 @@ import pandas as pd
 import streamlit as st
 
 # ─────────────────────────────────────────────
+# 1. 스트림릿 페이지 설정 (반드시 파일 맨 처음에 와야 합니다)
+# ─────────────────────────────────────────────
+st.set_page_config(page_title="주식 투자 게임", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
+
+# ─────────────────────────────────────────────
 # 게임 설정 (여기 숫자만 바꾸면 규칙이 바뀝니다)
 # ─────────────────────────────────────────────
 START_CASH = 1_000_000      # 시작 예산
@@ -227,12 +232,10 @@ def total_value(room, p):
 # 게임 로직 (원 단위 금액 변동: 최대 +30만원 / -20만원)
 # ─────────────────────────────────────────────
 def _rand_step_amount(lo, hi, step=1_000):
-    """천 원 단위로 깔끔한 변동 금액을 생성합니다."""
     return random.randrange(lo, hi + 1, step)
 
 
 def build_outcome(scenarios):
-    """헤드라인·특보·SNS 정보를 각각 판정해 한 라운드의 가격(원) 변동을 계산합니다."""
     changes = {}
     for scn in scenarios:
         is_true = random.random() < ACCURACY[scn["kind"]]
@@ -272,7 +275,6 @@ def draw(room):
     selected = []
     for kind in ("headline", "special", "sns"):
         scn = dict(random.choice([s for s in SCENARIOS if s["kind"] == kind]))
-        # SNS 기사는 뽑힐 때 2~3명 댓글을 미리 확정해 모든 진행자/관전자 화면에서 동일하게 보이게 함
         if kind == "sns":
             all_c = _normalise_comments(scn.get("comments", []))
             if all_c:
@@ -298,7 +300,6 @@ def resolve(room):
     res = []
     for k, (delta_amount, reason) in room["current"]["changes"].items():
         old = room["prices"][k]
-        # 주가 하한(1만원) ~ 상한(50만원) 범위 내에서 원 단위 반영
         new = max(MIN_PRICE, min(MAX_PRICE, old + int(delta_amount)))
         room["prices"][k] = new
         res.append({"key": k, "old": old, "new": new, "reason": reason})
@@ -505,9 +506,436 @@ def fmt(n):
 
 
 def fmt_delta(diff):
-    """가격 변동을 '▲ 50,000원' 또는 '▼ 30,000원' 형식으로 반환합니다."""
     if diff > 0:
         return f"▲ {diff:,}원"
     elif diff < 0:
+        return f"▼ {abs(diff):,}원"
+    return "0원 (-)"
+
+
+def _normalise_comments(raw_comments):
+    if not raw_comments:
+        return []
+    if isinstance(raw_comments, dict):
+        raw_items = list(raw_comments.items())
+    elif isinstance(raw_comments, (list, tuple)):
+        raw_items = list(raw_comments)
+    else:
+        raw_items = [raw_comments]
+
+    normalised = []
+    for item in raw_items:
+        if isinstance(item, dict):
+            speaker = item.get("speaker") or item.get("name") or "누리꾼"
+            comment = item.get("comment") or item.get("text") or ""
+        elif isinstance(item, (list, tuple)):
+            if len(item) >= 2:
+                speaker, comment = item[0], item[1]
+            elif len(item) == 1:
+                speaker, comment = "누리꾼", item[0]
+            else:
+                continue
+        else:
+            speaker, comment = "누리꾼", item
+        normalised.append((str(speaker), str(comment)))
+    return normalised
+
+
+def newspaper(articles):
+    if isinstance(articles, dict):
+        articles = articles.get("articles") or [articles]
+    if not isinstance(articles, (list, tuple)):
+        st.warning("이번 라운드의 신문 데이터를 불러오지 못했습니다.")
         return
-    
+
+    headline_scn = next((s for s in articles if s.get("kind") == "headline"), None)
+    special_scn = next((s for s in articles if s.get("kind") == "special"), None)
+    sns_scn = next((s for s in articles if s.get("kind") == "sns"), None)
+
+    with st.container(border=True):
+        st.markdown("<h3 style='text-align: center;'>📈 도농 경제신문</h3>", unsafe_allow_html=True)
+        st.divider()
+
+        left_col, right_col = st.columns(2)
+
+        with left_col:
+            if headline_scn:
+                with st.container(border=True):
+                    st.caption("📰 헤드라인 기사")
+                    st.markdown(f"#### {headline_scn.get('title', '')}")
+                    st.write(headline_scn.get('body', ''))
+            else:
+                st.info("헤드라인 기사가 없습니다.")
+
+        with right_col:
+            if special_scn:
+                with st.container(border=True):
+                    st.caption("📢 특보")
+                    st.markdown(f"#### {special_scn.get('title', '')}")
+                    st.write(special_scn.get('body', ''))
+            else:
+                st.info("특보가 없습니다.")
+
+            if sns_scn:
+                with st.container(border=True):
+                    st.caption("💬 SNS 누리꾼 대화")
+                    st.markdown(f"#### {sns_scn.get('title', '')}")
+                    st.write(sns_scn.get('body', ''))
+
+                    comments = sns_scn.get("sampled_comments")
+                    if comments is None:
+                        all_c = _normalise_comments(sns_scn.get("comments", []))
+                        comments = random.sample(all_c, min(random.choice([2, 3]), len(all_c))) if all_c else []
+
+                    if comments:
+                        st.markdown("---")
+                        for speaker, comment in comments:
+                            st.markdown(f"💬 **{speaker}**: {comment}")
+            else:
+                st.info("SNS 대화가 없습니다.")
+
+
+def players_df(room, status, spectator_view=False):
+    rows = []
+    for p in room["players"].values():
+        row = {"팀": p["name"], "현금": fmt(p["cash"])}
+        if not spectator_view:
+            hold = ", ".join(
+                f"{STOCKS[k]['name']} {n}주"
+                for k, n in p["holdings"].items() if n
+            ) or "-"
+            row["보유 주식"] = hold
+            row["총 자산"] = fmt(total_value(room, p))
+
+        if status == "trading":
+            row["상태"] = "✅ 완료" if p["done"] else "⏳ 거래 중"
+        elif status == "result":
+            row["상태"] = "라운드 종료"
+        elif status == "minigame":
+            q = p["quiz"]
+            row["상태"] = "-" if not q or q["solved"] is None else (
+                "⭕ 정답" if q["solved"] else "❌ 오답"
+            )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def spectator_progress_df(room):
+    return pd.DataFrame([
+        {"참가 팀": player["name"],
+         "거래 상태": "✅ 주식 사고팔기 완료" if player["done"] else "⏳ 거래 진행 중"}
+        for player in room["players"].values()
+    ])
+
+
+def show_player_holdings(room, player):
+    st.markdown("#### 📦 내 보유 주식")
+    owned = [(key, qty) for key, qty in player["holdings"].items() if qty > 0]
+    if not owned:
+        st.caption("현재 보유 중인 주식이 없습니다.")
+        return
+    rows = []
+    for key, qty in owned:
+        price = room["prices"][key]
+        rows.append({
+            "종목": f"{STOCKS[key]['icon']} {STOCKS[key]['name']}",
+            "보유 수량": f"{qty}주",
+            "현재 주가": fmt(price),
+            "평가 금액": fmt(qty * price),
+        })
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+
+def show_result(room):
+    changed = {r["key"]: r for r in room["result"]}
+    rows = []
+    for k, info in STOCKS.items():
+        r = changed.get(k)
+        if r and r["new"] != r["old"]:
+            diff = r["new"] - r["old"]
+            rows.append({
+                "종목": f"{info['icon']} {info['name']}",
+                "이전 가격": fmt(r["old"]),
+                "현재 가격": fmt(r["new"]),
+                "가격 변동": fmt_delta(diff),
+                "이유": r["reason"],
+            })
+        else:
+            rows.append({
+                "종목": f"{info['icon']} {info['name']}",
+                "이전 가격": fmt(room["prices"][k]),
+                "현재 가격": fmt(room["prices"][k]),
+                "가격 변동": "-",
+                "이유": "변동 없음",
+            })
+    st.markdown("#### 📊 이번 라운드 결과")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+
+def market(room, pid, tradable):
+    p = room["players"][pid]
+    buy_tab, sell_tab = st.tabs(["📈 매수", "📉 매도"])
+
+    def render_stock_trade(side):
+        for k, info in STOCKS.items():
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2.2, 1.4, 1.3], vertical_alignment="center")
+                c1.markdown(f"{info['icon']} **{info['name']}**")
+                price = room["prices"][k]
+                h = room["history"][k]
+                delta = price - h[-2] if len(h) > 1 else 0
+                tag = f" :red[(▲ {delta:,}원)]" if delta > 0 else (
+                    f" :blue[(▼ {abs(delta):,}원)]" if delta < 0 else ""
+                )
+                c2.markdown(f"현재가 **{price:,}원**{tag}")
+                if side == "buy":
+                    c3.caption(f"보유 {p['holdings'][k]}주")
+                else:
+                    c3.caption(f"매도 가능 {p['holdings'][k]}주")
+
+                q1, q2 = st.columns([1, 1])
+                q1.number_input(
+                    "수량", min_value=1, value=1, step=1,
+                    key=f"qty_{side}_{k}", label_visibility="collapsed"
+                )
+                q2.button(
+                    "매수하기" if side == "buy" else "매도하기",
+                    key=f"{side}_{k}",
+                    on_click=cb_trade, args=(room, pid, k, side),
+                    disabled=(not tradable or (side == "sell" and p["holdings"][k] == 0)),
+                    use_container_width=True,
+                )
+
+    with buy_tab:
+        st.caption("보유 현금 범위 안에서 주식을 매수할 수 있어요.")
+        render_stock_trade("buy")
+    with sell_tab:
+        st.caption("현재 보유하고 있는 주식만 매도할 수 있어요.")
+        render_stock_trade("sell")
+
+
+def show_hints(room, p):
+    if room["status"] != "trading":
+        return
+    hints = [h["text"] for h in p["hints"] if h["round"] == room["round"]]
+    if hints:
+        with st.container(border=True):
+            st.markdown("**🔎 이번 라운드 힌트**")
+            for hint in hints:
+                st.write("💡 " + hint)
+
+
+def show_host_round_preview(room):
+    current = room.get("current") or {}
+    changes = current.get("changes", {})
+    if not changes:
+        return
+    st.markdown("#### 🔐 진행자 전용 · 이번 라운드 주가 변동 미리보기")
+    rows = []
+    for key, change in changes.items():
+        delta_amount, reason = change
+        old_price = room["prices"][key]
+        expected_new = max(MIN_PRICE, min(MAX_PRICE, old_price + int(delta_amount)))
+        actual_diff = expected_new - old_price
+        rows.append({
+            "변동 종목": f"{STOCKS[key]['icon']} {STOCKS[key]['name']}",
+            "예상 방향": "📈 상승" if actual_diff > 0 else ("📉 하락" if actual_diff < 0 else "➖ 보합"),
+            "예상 변동 금액": f"{actual_diff:+,}원 (예상가 {expected_new:,}원)",
+            "변동 근거": reason,
+        })
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.caption("이 정보는 진행자 화면에만 표시되며 참가자와 관전자에게는 공개되지 않습니다.")
+
+
+def host_panel(room):
+    status = room["status"]
+    st.divider()
+    st.markdown("#### 🎛️ 진행자 패널")
+    if status == "lobby":
+        st.button("▶️ 게임 시작", on_click=cb_start, args=(room,), type="primary",
+                  disabled=not room["players"])
+        if not room["players"]:
+            st.caption("참가자가 한 명 이상 들어와야 시작할 수 있어요.")
+    elif status == "result":
+        c1, c2 = st.columns(2)
+        c1.button("⏭️ 다음 라운드 진행", on_click=cb_next, args=(room,), type="primary")
+        c2.button("🎲 미니게임 실시", on_click=cb_minigame, args=(room,))
+    elif status == "minigame":
+        st.button("⏭️ 미니게임 종료 · 다음 라운드 시작", on_click=cb_end_minigame, args=(room,), type="primary")
+    if status in ("result", "minigame") and room["players"]:
+        c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
+        c1.selectbox("힌트권을 줄 팀", list(room["players"].keys()), key="grant_pid",
+                     format_func=lambda x: room["players"][x]["name"])
+        c2.button("🎟️ 힌트권 주기", on_click=cb_grant, args=(room,))
+    if status in ("trading", "result", "minigame"):
+        st.button("🏁 게임 종료 (전량 매도 후 순위 발표)", on_click=cb_end_game, args=(room,))
+
+
+def landing():
+    st.title("📈 주식 투자 게임")
+    st.caption("뉴스·찌라시·SNS를 보고 오를 주식과 내릴 주식을 맞혀 보세요!")
+    c1, c2 = st.columns(2)
+    c1.button("🏠 방 만들기", on_click=cb_create, type="primary")
+    c2.button("🚪 방 참가하기", on_click=cb_join_mode)
+    if st.session_state.get("mode") == "join":
+        with st.container(border=True):
+            st.text_input("방 초대 코드 (알파벳 5자리)", key="join_code", max_chars=5)
+            st.radio("참여 방식", ["참가자", "관전자"], key="join_role", horizontal=True)
+            if st.session_state.get("join_role", "참가자") == "참가자":
+                st.text_input("팀 이름", key="join_name", max_chars=12)
+            st.button("게임 참여", on_click=cb_join, type="primary")
+            if st.session_state.get("join_error"):
+                st.error(st.session_state.join_error)
+
+
+def restore():
+    if "pid" in st.session_state:
+        return
+    code = st.query_params.get("room")
+    pid = st.query_params.get("pid")
+    room = ROOMS.get(code) if code else None
+    if not room or not pid:
+        return
+    if pid == room["host_id"]:
+        role = "host"
+    elif pid in room["players"]:
+        role = "player"
+    elif pid in room["spectators"]:
+        role = "spectator"
+    else:
+        return
+    st.session_state.update(code=code, pid=pid, role=role)
+
+
+# ─────────────────────────────────────────────
+# 실시간 화면 (자동 새로고침)
+# ─────────────────────────────────────────────
+@st.fragment(run_every=POLL_SECONDS)
+def live():
+    room = ROOMS.get(st.session_state.code)
+    if room is None:
+        st.error("방을 찾을 수 없어요 (서버가 다시 시작됐을 수 있어요). 나가기를 누르고 다시 시작해 주세요.")
+        return
+    tick(room)
+    role, pid, status = st.session_state.role, st.session_state.pid, room["status"]
+    me = room["players"].get(pid)
+
+    if room["round"] > 0 and status != "final":
+        st.subheader(f"라운드 {room['round']}")
+    if status == "trading":
+        remain = max(0, int(room["timer_end"] - time.time()))
+        st.progress(remain / ROUND_SECONDS, text=f"⏱️ 남은 시간 {remain // 60:02d}:{remain % 60:02d}")
+
+    # ── 대기방 ──
+    if status == "lobby":
+        st.subheader("🕐 대기방")
+        if role == "host":
+            st.info(f"초대 코드: **{room['code']}** — 참가자들에게 알려 주세요!")
+        names = [p["name"] for p in room["players"].values()]
+        st.write(f"현재 참가자 **{len(names)}명**, 관전자 {len(room['spectators'])}명")
+        if names:
+            st.write(" · ".join(f"🙋 {n}" for n in names))
+        if role != "host":
+            st.caption("진행자가 게임을 시작할 때까지 기다려 주세요...")
+
+    # ── 최종 결과 ──
+    elif status == "final":
+        st.subheader("🏆 최종 결과")
+        ranking = sorted(room["players"].values(), key=lambda p: p["cash"], reverse=True)
+        medals = ["🥇", "🥈", "🥉"]
+        rows = [{"순위": medals[i] if i < 3 else str(i + 1), "팀": p["name"], "최종 현금": fmt(p["cash"])}
+                for i, p in enumerate(ranking)]
+        if ranking:
+            st.success(f"우승: {ranking[0]['name']} 팀!")
+        st.dataframe(pd.DataFrame(rows), hide_index=True)
+
+    # ── 진행 중(매매 / 결과 / 미니게임) ──
+    else:
+        # 신문은 진행자(host)와 관전자(spectator)만 볼 수 있음
+        if role in ("host", "spectator"):
+            if status == "trading":
+                st.markdown("#### 이번 라운드 신문")
+                current = room.get("current") or {}
+                newspaper(current.get("articles") or current.get("sc") or [])
+                if role == "host":
+                    done = sum(p["done"] for p in room["players"].values())
+                    st.caption(f"거래 완료: {done} / {len(room['players'])}팀")
+                    show_host_round_preview(room)
+            if status in ("result", "minigame"):
+                show_result(room)
+            if role == "spectator" and status == "trading":
+                st.markdown("#### 👥 거래 진행 현황")
+                st.dataframe(spectator_progress_df(room), hide_index=True)
+            elif role == "host" or status in ("result", "final"):
+                st.markdown("#### 👥 참가자 현황")
+                st.dataframe(
+                    players_df(room, status, spectator_view=(role == "spectator")),
+                    hide_index=True
+                )
+
+        # 참가자(player) 화면: 신문은 숨기고 보유 자산 및 매매 창만 표시
+        elif me:
+            st.metric("보유 현금", fmt(me["cash"]))
+            show_player_holdings(room, me)
+            st.metric("총 자산", fmt(total_value(room, me)))
+            show_hints(room, me)
+            if status == "trading":
+                if me["done"]:
+                    st.success("거래를 완료했어요. 다른 팀을 기다리는 중...")
+                market(room, pid, tradable=not me["done"])
+                st.button("✅ 주식 사고 팔기 완료", on_click=cb_done, args=(room, pid),
+                          type="primary", disabled=me["done"])
+            else:
+                show_result(room)
+                if status == "minigame":
+                    st.markdown("#### 🎲 미니게임")
+                    q = me["quiz"]
+                    if q is None:
+                        st.info("이번 미니게임에는 참여하지 않았어요.")
+                    elif q["solved"] is None:
+                        st.markdown(f"### {q['q']}")
+                        st.number_input("정답 입력", step=1, value=0, key="quiz_ans")
+                        st.button("제출", on_click=cb_answer, args=(room, pid), type="primary")
+                    elif q["solved"]:
+                        st.success("정답! 다음 라운드가 시작되면 힌트가 공개돼요.")
+                    else:
+                        st.error("아쉽게도 오답이에요.")
+                else:
+                    st.caption("진행자가 다음 라운드를 시작할 때까지 기다려 주세요...")
+        if role == "host":
+            host_panel(room)
+
+    if status == "lobby" and role == "host":
+        host_panel(room)
+
+
+# ─────────────────────────────────────────────
+# 앱 시작점
+# ─────────────────────────────────────────────
+restore()
+
+if "role" not in st.session_state:
+    landing()
+else:
+    if "room_menu_open" not in st.session_state:
+        st.session_state.room_menu_open = True
+
+    if st.session_state.room_menu_open:
+        menu_cols = st.columns([0.08, 0.92], vertical_alignment="center")
+        if menu_cols[0].button("−", key="room_menu_hide", help="방 정보 접기"):
+            st.session_state.room_menu_open = False
+            st.rerun()
+        with st.container(border=True):
+            info_cols = st.columns([1.2, 2, 1.2, 1])
+            info_cols[0].caption("방 초대 코드")
+            info_cols[0].markdown(f"**`{st.session_state.code}`**")
+            info_cols[1].caption("접속 역할")
+            info_cols[1].write({"host": "🎛️ 진행자", "player": "🙋 참가자", "spectator": "👀 관전자"}[st.session_state.role])
+            info_cols[3].button("나가기", on_click=cb_leave, use_container_width=True)
+    else:
+        if st.button("＋", key="room_menu_show", help="방 정보 펼치기"):
+            st.session_state.room_menu_open = True
+            st.rerun()
+
+    st.title("📈 주식 투자 게임")
+    live()
