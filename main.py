@@ -49,27 +49,27 @@ def sc(kind, title, body, effects, true_reason, fake_reason):
 # 16개의 상황: effects = 기사가 암시하는 방향(+1 상승 / -1 하락)
 SCENARIOS = [
     sc("headline", "정부, 대규모 선박 수주 확정 발표",
-       "국내 조선사들이 해외 해운사와 20조 원 규모의 선박 건조 계약을 체결했다고 정부가 밝혔다.",
+       "국내 주요 조선사들이 해외 대형 해운사와 총 20조 원 규모의 선박 건조 계약을 체결한 것으로 확인됐다. 업계에 따르면 이번 계약에는 친환경 연료 추진선과 대형 컨테이너선 등이 포함됐으며, 향후 수년에 걸쳐 순차적으로 건조와 인도가 진행될 예정이다. 조선업계는 대규모 수주가 장기적인 일감 확보와 생산시설 가동률 개선으로 이어질 수 있다는 점에서 의미가 크다고 평가하고 있다. 다만 선박 건조에 필요한 후판 등 원자재 가격과 인건비, 환율 변동이 실제 수익성에 영향을 줄 수 있어 계약 규모만으로 실적 개선을 단정하기는 어렵다는 신중론도 나온다. 증권가에서는 이번 수주가 향후 실적 전망과 신규 계약 기대감에 어떤 영향을 미칠지 주목하고 있다.",
        {"ship": +1}, "대규모 수주 확정으로 조선업 실적 기대감이 커졌습니다.",
        "발표와 달리 실제 수주 규모가 크게 줄어 실망 매물이 나왔습니다."),
     sc("headline", "글로벌 AI 기업, 국내 반도체 업체에 HBM 대량 주문",
-       "AI 서버 수요가 폭증하면서 국내 반도체 업체에 대규모 주문이 들어왔다.",
+       "글로벌 인공지능(AI) 산업의 성장세가 이어지는 가운데 국내 반도체 기업들이 고대역폭메모리(HBM) 제품의 대규모 공급 주문을 확보한 것으로 전해졌다. AI 서버에는 대량의 데이터를 빠르게 처리할 수 있는 고성능 메모리가 필수적으로 사용되기 때문에 관련 제품의 수요가 빠르게 늘고 있다. 업계에서는 이번 주문이 실제 공급 계약과 매출로 이어질 경우 반도체 기업의 실적 개선 기대를 높일 수 있다고 보고 있다. 다만 생산능력 확대에 필요한 설비 투자와 경쟁사의 기술 추격, 글로벌 IT 기업들의 투자 계획 변화 등은 여전히 변수로 꼽힌다. 시장에서는 주문 규모뿐 아니라 납품 일정과 수익성까지 확인해야 한다는 의견이 나온다.",
        {"chip": +1}, "AI 수요 폭증으로 반도체 주문이 늘었습니다.",
        "주문이 갑자기 취소되며 기대감이 꺼졌습니다."),
     sc("headline", "주요 수출국, 자동차 관세 대폭 인상 확정",
-       "가장 큰 수출 시장에서 수입 자동차에 대한 관세를 크게 올리기로 했다.",
+       "국내 완성차 업계의 주요 수출 시장 가운데 한 국가가 수입 자동차에 적용하는 관세를 대폭 인상하기로 하면서 업계에 긴장감이 높아지고 있다. 관세가 실제 시행되면 현지 판매 가격이 상승하거나 제조사가 비용 일부를 부담해야 해 가격 경쟁력이 약화될 수 있다는 우려가 나온다. 특히 해당 시장의 판매 비중이 높은 기업일수록 수익성에 미치는 영향이 클 수 있다. 업계는 현지 생산 확대와 판매 전략 조정 등 대응 방안을 검토하고 있는 것으로 알려졌다. 다만 관세 적용 시기와 세부 기준, 협상 과정에 따라 실제 부담은 달라질 수 있어 향후 정책 발표를 지켜봐야 한다는 분석이다.",
        {"car": -1}, "관세 부담으로 자동차 수출 전망이 어두워졌습니다.",
        "관세 시행이 연기되면서 안도 매수가 몰렸습니다."),
     sc("headline", "중앙은행 기준금리 인상… 은행 예대마진 확대 전망",
-       "금리 인상으로 은행이 대출 이자로 얻는 수익이 늘어날 것으로 보인다.",
+       "중앙은행이 기준금리 인상을 결정하면서 은행권의 수익 구조에도 변화가 예상된다. 일반적으로 금리가 오르면 은행이 대출에 적용하는 금리와 예금에 지급하는 금리 사이의 차이인 예대마진이 확대될 가능성이 있어 단기적으로 이자이익 증가 기대가 커진다. 이에 따라 일부 금융기업의 실적 전망이 개선될 수 있다는 분석이 나온다. 그러나 금리 상승은 가계와 기업의 이자 부담을 키워 대출 연체율과 부실 위험을 높일 수 있다는 점에서 긍정적인 영향만 있는 것은 아니다. 금융시장에서는 예대마진 확대 효과와 대손 비용 증가 가능성을 함께 고려해야 한다는 지적이 나온다.",
        {"fin": +1}, "금리 인상으로 금융권 수익성 개선 기대가 커졌습니다.",
        "대출 연체율 급증 소식이 겹치며 금융주가 약세를 보였습니다."),
     sc("headline", "원자재 가격 폭락… 철강·화학 업계 비상",
-       "국제 원자재 가격이 한 달 새 급락하며 관련 업계의 수익성이 크게 나빠질 전망이다.",
+       "국제 원자재 가격이 단기간에 큰 폭으로 하락하면서 철강·화학 등 소재 산업의 경영 환경에 관심이 쏠리고 있다. 원자재 가격 하락은 제품 판매 가격에도 영향을 줄 수 있으며, 기업이 높은 가격에 확보해 둔 재고를 보유하고 있다면 재고 평가 손실이 발생할 가능성도 있다. 특히 원료 구매 시점과 제품 판매 시점 사이에 가격 차이가 큰 기업은 수익성 변동성이 커질 수 있다. 반면 원료를 새롭게 구매하는 기업에는 비용 절감 요인이 될 수 있어 업종과 기업별 영향은 다르게 나타날 수 있다. 시장에서는 원자재 가격의 하락 원인과 지속 여부, 기업별 재고 수준을 함께 살펴야 한다는 의견이 제기된다.",
        {"mat": -1}, "원자재 가격 급락으로 재료 기업의 수익성이 악화됐습니다.",
        "예상과 달리 원자재 가격이 반등하며 주가가 올랐습니다."),
     sc("headline", "국내 아이돌 그룹, 빌보드 1위 달성",
-       "국내 아이돌 그룹이 미국 빌보드 메인 차트에서 1위를 차지했다.",
+       "국내 아이돌 그룹이 미국 빌보드 메인 차트에서 1위를 기록하며 글로벌 음악 시장에서 높은 관심을 받고 있다. 이번 성과는 음원 소비와 음반 판매뿐 아니라 공연, 광고, 콘텐츠 유통 등 다양한 사업으로 이어질 가능성이 있다는 점에서 엔터테인먼트 업계의 주목을 끌고 있다. 소속사는 해외 활동과 추가 콘텐츠 공개를 검토하고 있으며, 관련 업계에서는 아티스트의 인지도가 높아질수록 브랜드 협업과 해외 공연 수요도 확대될 수 있다고 보고 있다. 다만 차트 성적이 장기적인 매출 증가로 연결되기 위해서는 후속 활동과 팬덤 유지가 중요하다. 시장에서는 이번 성과가 소속사의 실적과 기업 가치에 미칠 영향을 주시하고 있다.",
        {"ent": +1}, "빌보드 1위 소식에 엔터 기업 가치가 올랐습니다.",
        "집계 오류가 확인되어 호재가 사라졌습니다."),
     sc("special", "[특보] 반도체 공장 대규모 정전 사고",
@@ -117,26 +117,47 @@ SCENARIOS = [
 # SNS 기사마다 여러 이용자의 반응을 함께 보여줍니다.
 SNS_COMMENTS = {
     "sns_1": [
-        "조선은 수주만 잘 따오면 실적 기대감 확실히 붙는 듯ㅋㅋ",
-        "자동차까지 같이 오른다는 건 너무 낙관적인 거 아닌가?",
-        "나도 일단 조금 담아볼까 고민 중임.",
+        ("김태린", "조선업 수주 규모가 꽤 큰데? 이번 계약이 실적에 반영되려면 시간이 좀 걸리겠지."),
+        ("이서영", "자동차까지 같이 오른다는 얘기는 아직 근거가 부족한 것 같아."),
+        ("박선유", "나는 친환경 선박 쪽 수요가 계속 늘어날지가 더 중요해 보여."),
+        ("박경민", "뉴스만 보면 호재인데 원자재 가격도 같이 확인해야 할 듯."),
+        ("이예나", "일단 시장 반응을 보고 들어가도 늦지 않을 것 같은데ㅋㅋ"),
+        ("정하영", "수주 계약이 실제 매출로 잡히는 시점도 따져봐야지."),
+        ("유예나", "그래도 조선업 분위기가 좋아지는 신호인 건 맞는 듯!"),
+        ("손예원", "나는 자동차는 관세 이슈도 있어서 조금 더 지켜볼래."),
     ],
     "sns_2": [
-        "CEO 사임이면 회사 방향도 바뀌는 거 아님?",
-        "공식 발표 나오기 전까지는 좀 지켜보는 게 맞을 듯.",
-        "내부자 정보라는 말은 일단 걸러 들어야 함.",
+        ("박수현", "CEO 사임설이면 회사 경영 방향에도 영향이 있을 수 있겠네."),
+        ("곽이안", "근데 아직 공식 발표가 없잖아. 소문만 믿기는 위험하지."),
+        ("김나윤", "반도체는 기술 경쟁도 심해서 경영진 변화가 변수일 수는 있겠다."),
+        ("안민영", "내부자한테 들었다는 말은 출처부터 확인해야 함."),
+        ("박효찬", "이런 글 올라오면 주가가 먼저 움직일 수도 있어서 무섭다."),
+        ("이진우", "사실인지 아닌지는 공시나 공식 발표가 나와야 알겠지."),
+        ("신재민", "불확실할 때는 무리하게 매수하지 않는 게 낫다고 봄."),
+        ("이시우", "결국 확인된 정보와 온라인 소문은 구분해서 봐야지."),
     ],
     "sns_3": [
-        "신인 그룹 반응 좋은 건 맞는 것 같음.",
-        "금융주는 금리만 보고 판단하기에는 변수가 많지.",
-        "커뮤니티 글 하나만 믿고 투자하면 위험함ㅋㅋ",
+        ("김태린", "신인 그룹 티저 반응이 좋으면 엔터 쪽 기대감은 생기겠다."),
+        ("박선유", "조회수만으로 흥행을 확신할 수는 없지 않을까?"),
+        ("이예나", "팬덤이 실제 앨범이나 공연 소비로 이어지는지가 중요할 듯."),
+        ("정하영", "금융주는 금리랑 연체율을 같이 봐야 해서 단순하게 판단하기 어렵겠어."),
+        ("박수현", "한쪽은 신인 데뷔 기대감, 한쪽은 금융 불안 소문이네."),
+        ("김나윤", "서로 다른 산업이라 각자 근거를 따져보는 게 좋겠어."),
+        ("박경민", "나는 공식 일정이나 실적 자료가 나올 때까지 기다려볼래."),
+        ("손예원", "SNS 반응이 뜨거워도 투자 판단은 따로 해야 한다는 거지ㅋㅋ"),
     ],
     "sns_4": [
-        "정부 지원이면 재료 기업들한테 호재일 수도 있겠네.",
-        "지원금 규모랑 대상부터 확인해야 하는 거 아닌가?",
-        "이런 글은 출처가 확실한지부터 봐야 함.",
+        ("유예나", "정부 지원금 소식이면 소재 기업에는 분명 관심이 쏠릴 만하네."),
+        ("곽이안", "지원 대상이 모든 기업인지 특정 기술 분야인지부터 확인해야 해."),
+        ("안민영", "정책 발표 전에 기대감만으로 움직이는 경우도 많더라."),
+        ("박효찬", "지원 규모가 실제 기업 매출에 얼마나 영향을 줄지도 중요하지."),
+        ("이진우", "공식 보도자료가 있는지 찾아보는 게 먼저일 듯."),
+        ("신재민", "재료산업은 원자재 가격도 변수라서 정책 하나만 보면 안 돼."),
+        ("이서영", "그래도 신소재 분야가 주목받는 계기가 될 수는 있겠다."),
+        ("이시우", "확인 전까지는 가능성 정도로만 생각하는 게 맞겠어."),
     ],
 }
+
 for i, scenario in enumerate([s for s in SCENARIOS if s["kind"] == "sns"], start=1):
     scenario["comments"] = SNS_COMMENTS[f"sns_{i}"]
 
@@ -463,15 +484,15 @@ def newspaper(articles):
             st.write(scn["body"])
             if scn["kind"] == "sns":
                 st.markdown("**댓글**")
-                for comment in scn.get("comments", []):
-                    st.write(f"💬 {comment}")
+                for speaker, comment in scn.get("comments", []):
+                    st.markdown(f"**{speaker}**  {comment}")
 
 
 def players_df(room, status, spectator_view=False):
     rows = []
     for p in room["players"].values():
         row = {"팀": p["name"], "현금": fmt(p["cash"])}
-        if not (spectator_view and status == "result"):
+        if not spectator_view:
             hold = ", ".join(
                 f"{STOCKS[k]['name']} {n}주"
                 for k, n in p["holdings"].items() if n
@@ -490,6 +511,29 @@ def players_df(room, status, spectator_view=False):
             )
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def spectator_progress_df(room):
+    """관전자에게는 팀 이름과 거래 완료 여부만 공개합니다."""
+    return pd.DataFrame([
+        {"참가 팀": player["name"],
+         "거래 상태": "✅ 주식 사고팔기 완료" if player["done"] else "⏳ 거래 진행 중"}
+        for player in room["players"].values()
+    ])
+
+
+def show_player_holdings(player):
+    """참가자 본인에게 보유 중인 종목만 표시합니다."""
+    owned = [
+        f"{STOCKS[key]['icon']} **{STOCKS[key]['name']}** · {qty}주"
+        for key, qty in player["holdings"].items() if qty > 0
+    ]
+    st.markdown("#### 📦 내 보유 주식")
+    if owned:
+        for item in owned:
+            st.markdown(f"- {item}")
+    else:
+        st.caption("현재 보유 중인 주식이 없습니다.")
 
 
 def show_result(room):
@@ -681,22 +725,25 @@ def live():
             if status == "trading":
                 st.markdown("#### 이번 라운드 신문")
                 newspaper(room["current"]["articles"])
-                done = sum(p["done"] for p in room["players"].values())
-                st.caption(f"거래 완료: {done} / {len(room['players'])}팀")
+                if role == "host":
+                    done = sum(p["done"] for p in room["players"].values())
+                    st.caption(f"거래 완료: {done} / {len(room['players'])}팀")
             if status in ("result", "minigame"):
                 show_result(room)
-            # 관전자는 거래·미니게임 진행 중 다른 팀의 현황을 볼 수 없습니다.
-            # 라운드 결과 화면에서는 현금과 상태만 공개합니다.
-            if role == "host" or status in ("result", "final"):
+            # 관전자는 매매 중 팀 이름과 거래 완료 여부만 확인할 수 있습니다.
+            if role == "spectator" and status == "trading":
+                st.markdown("#### 👥 거래 진행 현황")
+                st.dataframe(spectator_progress_df(room), hide_index=True)
+            elif role == "host" or status in ("result", "final"):
                 st.markdown("#### 👥 참가자 현황")
                 st.dataframe(
                     players_df(room, status, spectator_view=(role == "spectator")),
                     hide_index=True
                 )
         elif me:
-            c1, c2 = st.columns(2)
-            c1.metric("보유 현금", fmt(me["cash"]))
-            c2.metric("총 자산", fmt(total_value(room, me)))
+            st.metric("보유 현금", fmt(me["cash"]))
+            show_player_holdings(me)
+            st.metric("총 자산", fmt(total_value(room, me)))
             show_hints(room, me)
             if status == "trading":
                 if me["done"]:
@@ -731,16 +778,32 @@ def live():
 # ─────────────────────────────────────────────
 # 앱 시작점
 # ─────────────────────────────────────────────
-st.set_page_config(page_title="주식 투자 게임", page_icon="📈", layout="wide")
+st.set_page_config(page_title="주식 투자 게임", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 restore()
 
 if "role" not in st.session_state:
     landing()
 else:
-    with st.sidebar:
-        st.markdown("### 방 초대 코드")
-        st.markdown(f"## `{st.session_state.code}`")
-        st.write({"host": "🎛️ 진행자", "player": "🙋 참가자", "spectator": "👀 관전자"}[st.session_state.role])
-        st.button("나가기", on_click=cb_leave)
+    if "room_menu_open" not in st.session_state:
+        st.session_state.room_menu_open = True
+
+    # 방 정보 영역은 + / − 버튼으로 접고 펼칠 수 있습니다.
+    if st.session_state.room_menu_open:
+        menu_cols = st.columns([0.08, 0.92], vertical_alignment="center")
+        if menu_cols[0].button("−", key="room_menu_hide", help="방 정보 접기"):
+            st.session_state.room_menu_open = False
+            st.rerun()
+        with st.container(border=True):
+            info_cols = st.columns([1.2, 2, 1.2, 1])
+            info_cols[0].caption("방 초대 코드")
+            info_cols[0].markdown(f"**`{st.session_state.code}`**")
+            info_cols[1].caption("접속 역할")
+            info_cols[1].write({"host": "🎛️ 진행자", "player": "🙋 참가자", "spectator": "👀 관전자"}[st.session_state.role])
+            info_cols[3].button("나가기", on_click=cb_leave, use_container_width=True)
+    else:
+        if st.button("＋", key="room_menu_show", help="방 정보 펼치기"):
+            st.session_state.room_menu_open = True
+            st.rerun()
+
     st.title("📈 주식 투자 게임")
     live()
