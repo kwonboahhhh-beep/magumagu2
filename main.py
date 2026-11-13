@@ -305,8 +305,8 @@ SCENARIOS = [
 ]
 
 # SNS 댓글 닉네임·공통 댓글 재료 (매번 다른 사람, 다른 말투가 나오도록)
-NICK_A = ["존버", "떡상", "개미", "단타", "물린", "눈치", "익명", "새벽", "치킨", "라면", "커피", "야근", "월급", "소액"]
-NICK_B = ["러", "왕", "장인", "요정", "지망생", "대장", "수집가", "연구소", "도사", "집사", "청년", "부장"]
+SNS_NAMES = ["김태린", "박선유", "이서영", "박경민", "이예나", "정하영", "유예나", "손예원",
+             "박수현", "곽이안", "김나윤", "안민영", "박효찬", "이진우", "신재민", "이시우"]
 GENERIC_REPLIES = {
     "pro": ["{n} 이거 느낌 온다. 나는 간다", "{n} 슬슬 움직일 타이밍 아님?", "{n} 얘기 나올 줄 알았음"],
     "con": ["{n}? 개미 꼬시는 글 냄새남", "출처가 어디임? 캡처만 보고는 못 믿겠는데", "이런 글 믿고 샀다가 물린 사람 한둘이 아님"],
@@ -438,12 +438,11 @@ def build_outcome(scenarios):
 
 
 def _nick(used):
-    for _ in range(30):
-        n = random.choice(NICK_A) + random.choice(NICK_B) + str(random.randint(1, 99))
-        if n not in used:
-            used.add(n)
-            return n
-    return "누리꾼" + str(random.randint(100, 999))
+    """SNS 작성자·댓글 작성자 이름 (겹치지 않게 뽑는다)"""
+    left = [n for n in SNS_NAMES if n not in used]
+    name = random.choice(left) if left else random.choice(SNS_NAMES)
+    used.add(name)
+    return name
 
 
 def _reply_likes():
