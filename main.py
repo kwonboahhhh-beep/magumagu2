@@ -18,8 +18,13 @@ st.set_page_config(page_title="주식 투자 게임", page_icon="📈", layout="
 START_CASH = 1_000_000      # 시작 예산
 START_PRICE = 50_000        # 주식 초기 가격 (최소 5만 원 시작)
 MIN_PRICE = 10_000          # 주가 하한 (상한선은 무제한)
-MAX_PRICE_UP = 300_000      # 한 라운드 최대 상승 금액 (+30만원)
-MAX_PRICE_DOWN = 200_000    # 한 라운드 최대 하락 금액 (-20만원)
+PRICE_UP_MIN = 30_000       # 한 라운드 최소 상승 금액
+PRICE_UP_MAX = 200_000      # 한 라운드 최대 상승 금액
+PRICE_DOWN_MIN = 30_000     # 한 라운드 최소 하락 금액
+PRICE_DOWN_MAX = 100_000    # 한 라운드 최대 하락 금액
+PRICE_STEP = 1_000          # 가격 변동 단위
+MIN_RISING_STOCKS = 2       # 한 라운드에 오르는 종목 최소 개수
+MIN_FALLING_STOCKS = 2      # 한 라운드에 내리는 종목 최소 개수
 ROUND_SECONDS = 300         # 매매 시간(5분)
 MINIGAME_CHANCE = 0.3       # 라운드 사이 미니게임 확률
 MINIGAME_FORCE_AFTER = 4    # 4번 연속 안 나오면 5번째에는 반드시 발생
@@ -45,15 +50,16 @@ STOCKS = {
 KIND_LABEL = {"headline": "📰 헤드라인 기사", "special": "📢 긴급 특보", "sns": "💬 SNS 누리꾼 대화"}
 ACCURACY = {"headline": 0.9, "special": 0.6, "sns": 0.40}  # SNS 확률 40%
 
+# 소식 종류별 변동 금액 범위 (전체 범위: 상승 3만~20만 / 하락 3만~10만)
 PRICE_DELTA_UP = {
-    "headline": (20_000, 120_000),
-    "special": (50_000, 200_000),
-    "sns": (80_000, 300_000),
+    "headline": (30_000, 120_000),
+    "special": (50_000, 160_000),
+    "sns": (80_000, 200_000),
 }
 PRICE_DELTA_DOWN = {
-    "headline": (20_000, 100_000),
-    "special": (40_000, 150_000),
-    "sns": (60_000, 200_000),
+    "headline": (30_000, 70_000),
+    "special": (40_000, 90_000),
+    "sns": (60_000, 100_000),
 }
 
 
@@ -62,7 +68,16 @@ def sc(kind, title, body, effects, true_reason, fake_reason):
                 true_reason=true_reason, fake_reason=fake_reason)
 
 
-# 20개의 시나리오 (따옴표 오류가 없도록 안전하게 수정된 본문)
+def sns(platform, title, body, effects, true_reason, fake_reason, replies):
+    """SNS 소식: 플랫폼마다 말투와 반응이 다르고, 댓글은 매번 새로 섞여서 나옵니다.
+    replies = [(입장, 댓글)] / 입장: pro(동의) con(반박) joke(드립) ask(질문) info(정정·제보)"""
+    s = sc("sns", title, body, effects, true_reason, fake_reason)
+    s["platform"] = platform
+    s["replies"] = replies
+    return s
+
+
+# 시나리오 (헤드라인 10 / 특보 6 / SNS 12)
 SCENARIOS = [
     # ── [헤드라인: 단일 산업 6종] ──
     sc("headline", "정부, 대규모 선박 수주 확정 발표… 조선업계 3년 치 일감 확보",
@@ -154,70 +169,151 @@ SCENARIOS = [
        {"mat": +1}, "신소재 기대감에 재료주가 올랐습니다.",
        "특허 분쟁 소식이 나오며 기대가 사라졌습니다."),
 
-    # ── [SNS 대화 4종] ──
-    sc("sns", "@주식고수: 이번에 조선이랑 자동차 둘 다 간다ㅋㅋ",
-       "\"내가 아는 사람이 직접 들은 얘기임. 지금 안 사면 후회함 ㅋㅋ\"",
-       {"ship": +1, "car": +1}, "소문대로 조선·자동차가 함께 급등했습니다.",
-       "소문과 정반대로 조선·자동차가 함께 급락했습니다."),
-    sc("sns", "익명 게시판: 반도체 회사 CEO 사임한다던데?",
-       "\"곧 공식 발표 나온대. 내부자가 알려줌. 이건 진짜임\"",
-       {"chip": -1}, "CEO 사임 발표로 반도체주가 급락했습니다.",
-       "사임설은 가짜 뉴스로 밝혀지며 주가가 급등했습니다."),
-    sc("sns", "커뮤니티: 엔터 대박 신인 데뷔한다, 금융주는 곧 폭락각",
-       "\"신인 그룹 티저 영상 조회수 미쳤다. 반대로 은행주는 끝났다고 봄\"",
-       {"ent": +1, "fin": -1}, "소문대로 엔터주는 오르고 금융주는 내렸습니다.",
-       "소문과 반대로 엔터주는 내리고 금융주는 올랐습니다."),
-    sc("sns", "인플루언서: 재료산업 곧 정부 지원금 받는대! 지금이 기회",
-       "\"정부 관계자한테 들었음. 영끌각ㅋㅋ 이번엔 진짜\"",
-       {"mat": +1}, "정부 지원 소식이 사실로 확인되어 급등했습니다.",
-       "지원 소식은 헛소문이었고 실망 매물이 쏟아졌습니다."),
+    # ── [SNS 12종: 플랫폼·말투·댓글 분위기가 전부 다릅니다] ──
+    sns("주식 오픈채팅방", "[캡처] 조선소 다니는 친구가 단톡방에 올린 사진",
+        "도크가 꽉 차서 야간 근무까지 늘렸다는데... 이거 수주 터진 거 아니냐?",
+        {"ship": +1}, "수주 호조설이 사실로 확인되며 조선주가 올랐습니다.",
+        "야간 근무는 단순 수리 물량 때문이었다는 해명이 나와 조선주가 내렸습니다.",
+        [("pro", "야간 근무까지 늘었으면 일감이 넘친다는 뜻이지. 이건 신호임"),
+         ("pro", "우리 삼촌도 조선소인데 요즘 잔업 엄청 시킨다더라"),
+         ("con", "수리 물량 때문에 바쁜 걸 수도 있잖아 ㅋㅋ"),
+         ("con", "사진 한 장으로 수주 확정이라니 너무 나갔다"),
+         ("joke", "조선소 직원 퇴근 못 하는 게 호재인 세상 ㄷㄷ"),
+         ("ask", "혹시 어느 조선소인지 아는 사람?"),
+         ("info", "작년에도 비슷한 사진 돌았는데 그땐 별일 없었음")]),
+    sns("직장인 익명 앱", "반도체 연구원인데 이번 신공정 결과가 심상치 않다",
+        "이번 분기 시험 생산 결과 보고 팀 전체가 술렁였다. 더는 말 못 함. 곧 알게 될 거다.",
+        {"chip": +1}, "신공정 수율 개선이 확인되며 반도체주가 올랐습니다.",
+        "시험 생산 결과가 기대에 못 미친 것으로 알려져 반도체주가 내렸습니다.",
+        [("pro", "'술렁였다'가 좋은 쪽이면 대박인데?"),
+         ("pro", "연구원이 이 정도로 흘리면 보통 좋은 소식이더라"),
+         ("con", "나쁜 결과였어도 술렁였겠지 ㅋㅋ 방향이 없네"),
+         ("con", "인증도 없는 익명글을 왜 믿냐"),
+         ("joke", "'더는 말 못 함'이 제일 말 많은 사람 말투임"),
+         ("ask", "좋은 쪽 맞음? 나쁜 쪽 맞음? 말을 하다 말아?"),
+         ("info", "저 글쓴이 지난번에도 비슷한 글 썼다가 삭제함")]),
+    sns("영상 플랫폼 댓글창", "신차 시승 영상 댓글 분위기 미쳤다",
+        "'이 가격에 이 성능이면 사야지'가 좋아요 1만 개. 대리점 문의가 폭주한다는 후기도 달리는 중.",
+        {"car": +1}, "신차 호평이 실제 계약으로 이어져 자동차주가 올랐습니다.",
+        "호평이 광고 효과였고 실제 계약이 부진해 자동차주가 내렸습니다.",
+        [("pro", "나도 대리점 전화해 봤는데 대기 걸림"),
+         ("pro", "시승 영상 보고 계약한 사람 여기 있음"),
+         ("con", "광고 영상 아님? 협찬 티 너무 나는데"),
+         ("con", "댓글 좋아요 조작 의심됨. 계정 다 비슷함"),
+         ("joke", "영상 보다가 통장 잔고 보고 조용히 끔"),
+         ("ask", "실제 계약 대수는 아직 모르는 거지?"),
+         ("info", "이 영상 조회수 어제 갑자기 뛴 거 봄")]),
+    sns("팬카페 공지 게시판", "[긴급] 소속사 컴백 일정이 또 밀렸다",
+        "공지 없이 앨범 발매가 두 번째로 연기됐다. 해외 투어 취소설까지 도는 중.",
+        {"ent": -1}, "컴백 연기와 투어 불확실성에 엔터주가 내렸습니다.",
+        "연기는 완성도를 높이기 위한 것이어서 오히려 기대감이 커져 엔터주가 올랐습니다.",
+        [("pro", "두 번 연기는 진짜 이상하다. 뭔가 있음"),
+         ("pro", "투어 취소설까지 돌면 광고 쪽도 흔들릴 듯"),
+         ("con", "완성도 올리려고 미룬 거면 오히려 좋은 거 아님?"),
+         ("con", "취소설 출처가 어디임? 팬카페 추측글이잖아"),
+         ("joke", "컴백 기다리다 군대 다녀오겠다 ㅋㅋ"),
+         ("ask", "공식 입장 나온 거 있어?"),
+         ("info", "예전에도 연기했다가 더 크게 돌아온 적 있음")]),
+    sns("커뮤니티 핫글", "은행 창구 직원인데 요즘 분위기가 이상함",
+        "연체 상담이 눈에 띄게 늘었다. 지점장도 회의 때마다 표정이 안 좋다.",
+        {"fin": -1}, "연체 증가 우려가 사실로 확인되며 금융주가 내렸습니다.",
+        "연체 상담은 일시적이었고 실적이 양호해 금융주가 올랐습니다.",
+        [("pro", "요즘 대출 이자 때문에 다들 힘들다던데 맞는 말 같다"),
+         ("pro", "우리 지점도 비슷함. 상담 대기 줄 길어졌어"),
+         ("con", "한 지점 얘기를 전체로 일반화하면 안 되지"),
+         ("con", "은행은 원래 연말이면 상담 늘어남"),
+         ("joke", "창구 직원 말이 제일 빠른 경제지표 ㅋㅋ"),
+         ("ask", "연체율 통계는 언제 나옴?"),
+         ("info", "작년에도 이런 글 올라왔는데 아무 일도 없었음")]),
+    sns("주식 오픈채팅방", "철강 공장 쪽 지인 얘긴데 가격 반등 신호래",
+        "가동률이 오르고 거래처 주문이 갑자기 늘었다고 함. 오늘 아침 공장 분위기가 달랐다는데.",
+        {"mat": +1}, "원자재 수요 반등이 확인되어 재료주가 올랐습니다.",
+        "주문 증가는 일시적 재고 확보였고 가격이 다시 약세를 보여 재료주가 내렸습니다.",
+        [("pro", "원자재 바닥 찍고 올라오는 느낌 있긴 했음"),
+         ("pro", "주문 늘면 단가도 같이 오르지. 논리는 맞네"),
+         ("con", "일시적 재고 확보일 수도 있음"),
+         ("con", "지인 얘기는 근거가 아님 ㅋㅋ"),
+         ("joke", "지인이 이렇게 많은 주식장은 처음 본다"),
+         ("ask", "가동률이 정확히 몇 퍼센트 올랐다는 거임?"),
+         ("info", "이런 반등설 지난달에도 한 번 돌다 사라짐")]),
+    sns("숏폼 영상 댓글", "'차는 중고로 버티고 콘서트에 쓴다' 영상 대유행",
+        "'요즘은 신차 대신 구독 서비스랑 콘서트 티켓에 돈 쓴다'는 영상이 조회수 300만을 넘겼다.",
+        {"car": -1, "ent": +1}, "소비 트렌드 변화로 엔터주는 오르고 자동차주는 내렸습니다.",
+        "유행은 일부 계층에 한정된 얘기여서 자동차주는 오르고 엔터주는 내렸습니다.",
+        [("pro", "나도 차 바꿀 돈으로 콘서트 다녀옴. 공감 100%"),
+         ("pro", "주변 20대는 차 안 사고 공연 보러 다니던데"),
+         ("con", "그건 일부 사람들 얘기고 차 수요가 줄겠냐"),
+         ("con", "영상 만든 사람 직업이 뭔데? 콘텐츠 장사하는 사람 같은데"),
+         ("joke", "내 통장은 신차도 콘서트도 못 가는 중 ㅋㅋ"),
+         ("ask", "이게 실제 판매량에도 나타남?"),
+         ("info", "유행어일 뿐이라는 분석도 있음")]),
+    sns("경제 유튜버 라이브 채팅", "'금리 오르면 은행은 웃고 반도체는 식는다' 해설 확산",
+        "라이브 채팅창에서 금리 인상 → 은행 수익 개선, 성장주 투자 심리 위축이라는 해설이 퍼지는 중.",
+        {"fin": +1, "chip": -1}, "금리 기대로 금융주는 오르고 반도체주는 내렸습니다.",
+        "금리 인상 기대가 꺾이며 금융주는 내리고 반도체주는 올랐습니다.",
+        [("pro", "금리 오르면 은행이 돈 버는 건 교과서임"),
+         ("pro", "성장주는 금리에 약하다는 건 맞는 말이지"),
+         ("con", "반도체는 금리보다 수요가 더 중요하지 않나?"),
+         ("con", "한 유튜버 의견 가지고 포트 짜지 마라"),
+         ("joke", "채팅창이 오늘 다 증권사 애널리스트네"),
+         ("ask", "금리 인상이 확정된 건 아니지?"),
+         ("info", "금리 얘기 나올 때마다 이런 해설 나오긴 함")]),
+    sns("물류 단체 대화방", "[캡처] 해운 불안 속에서 철강 공급사만 바쁘다는 얘기",
+        "선박 발주 취소 얘기가 도는 와중에 철강 공급사는 긴급 주문을 받고 있다는 캡처가 올라왔다.",
+        {"ship": -1, "mat": +1}, "수주 불안에 조선주는 내리고 소재 주문 증가에 재료주는 올랐습니다.",
+        "수주 불안은 기우였고 조선주는 오르고 재료주는 차익 매물에 내렸습니다.",
+        [("pro", "발주 줄면 조선은 힘들고 소재는 비축 수요로 바쁘지"),
+         ("pro", "공급사 쪽 지인도 요즘 정신없다던데"),
+         ("con", "조선이랑 철강이 반대로 움직인다는 근거가 약하다"),
+         ("con", "캡처 속 대화 날짜가 안 보임"),
+         ("joke", "이쪽이 울면 저쪽이 웃는 게 주식이지 뭐"),
+         ("ask", "취소된 발주 규모가 실제로 얼마임?"),
+         ("info", "과거에도 비슷한 캡처 돌았다가 반만 맞았음")]),
+    sns("익명 제보 게시판", "반도체 대표가 해외 기업 인수 협상 중이라던데?",
+        "비밀유지 계약 때문에 말 못 한다는데, 이번 주 안에 윤곽 나온대. 법무팀이 야근 중이라는 제보.",
+        {"chip": +1}, "인수 협상이 사실로 알려지며 반도체주가 올랐습니다.",
+        "인수설이 부인되며 반도체주가 내렸습니다.",
+        [("pro", "법무팀 야근은 진짜 신호임. 인수 건 맞을 듯"),
+         ("pro", "이번 주 안에 나온다는 게 구체적이라 믿음 간다"),
+         ("con", "인수설은 늘 도는 루머잖아"),
+         ("con", "해외 기업 이름도 없는 제보를 어떻게 믿냐"),
+         ("joke", "인수설 돌 때마다 내 계좌만 인수당함"),
+         ("ask", "공시 뜬 거 있으면 알려주세요"),
+         ("info", "비슷한 인수설이 작년에도 한 번 있었고 아니었음")]),
+    sns("중고차 커뮤니티", "신차 브레이크 결함 제보가 올라오고 있다",
+        "같은 모델 차주 몇 명이 비슷한 현상을 올렸다. 아직 공식 발표나 리콜 공지는 없음.",
+        {"car": -1}, "리콜 우려가 사실로 확인되며 자동차주가 내렸습니다.",
+        "결함 제보는 오해로 밝혀져 자동차주가 올랐습니다.",
+        [("pro", "나도 같은 증상 있었음. 센터에서는 정상이라는데"),
+         ("pro", "결함 제보가 여러 건이면 리콜 수순 아님?"),
+         ("con", "차주 몇 명 얘기로 리콜까지 가진 않음"),
+         ("con", "정비 문제를 결함으로 착각하는 경우도 많음"),
+         ("joke", "내 차는 브레이크보다 월급이 먼저 안 서더라"),
+         ("ask", "공식 센터 답변 받은 사람 있어요?"),
+         ("info", "작년에도 비슷한 제보가 있었는데 단순 소모품 문제였음")]),
+    sns("재테크 카페", "증권사 직원이 전하는 요즘 계좌 개설 분위기",
+        "신규 계좌 개설이 폭주하고 거래량도 평소의 두 배라고 한다. 수수료 수익이 최고일 것 같다는 얘기.",
+        {"fin": +1}, "거래대금 급증이 확인되며 금융주가 올랐습니다.",
+        "거래 열기가 빠르게 식으며 금융주가 내렸습니다.",
+        [("pro", "우리 회사도 신규 고객 문의 폭발임"),
+         ("pro", "거래량 늘면 증권사는 무조건 이득이지"),
+         ("con", "개설만 많고 실제 거래는 별로일 수도 있음"),
+         ("con", "직원이 자기 회사 좋게 말하는 건 당연한 거 아님?"),
+         ("joke", "나도 계좌 개설해서 이 파도에 기여 중 ㅋㅋ"),
+         ("ask", "이 분위기가 얼마나 갈까요?"),
+         ("info", "거래대금은 결국 시장 분위기 따라 빠르게 식음")]),
 ]
 
-SNS_COMMENTS = {
-    "sns_1": [
-        ("김태린", "조선업 수주 규모가 꽤 큰데? 이번 계약이 실적에 반영되려면 시간이 좀 걸리겠지."),
-        ("이서영", "자동차까지 같이 오른다는 얘기는 아직 근거가 부족한 것 같아."),
-        ("박선유", "나는 친환경 선박 쪽 수요가 계속 늘어날지가 더 중요해 보여."),
-        ("박경민", "뉴스만 보면 호재인데 원자재 가격도 같이 확인해야 할 듯."),
-        ("이예나", "일단 시장 반응을 보고 들어가도 늦지 않을 것 같은데ㅋㅋ"),
-        ("정하영", "수주 계약이 실제 매출로 잡히는 시점도 따져봐야지."),
-        ("유예나", "그래도 조선업 분위기가 좋아지는 신호인 건 맞는 듯!"),
-        ("손예원", "나는 자동차는 관세 이슈도 있어서 조금 더 지켜볼래."),
-    ],
-    "sns_2": [
-        ("박수현", "CEO 사임설이면 회사 경영 방향에도 영향이 있을 수 있겠네."),
-        ("곽이안", "근데 아직 공식 발표가 없잖아. 소문만 믿기는 위험하지."),
-        ("김나윤", "반도체는 기술 경쟁도 심해서 경영진 변화가 변수일 수는 있겠다."),
-        ("안민영", "내부자한테 들었다는 말은 출처부터 확인해야 함."),
-        ("박효찬", "이런 글 올라오면 주가가 먼저 움직일 수도 있어서 무섭다."),
-        ("이진우", "사실인지 아닌지는 공시나 공식 발표가 나와야 알겠지."),
-        ("신재민", "불확실할 때는 무리하게 매수하지 않는 게 낫다고 봄."),
-        ("이시우", "결국 확인된 정보와 온라인 소문은 구분해서 봐야지."),
-    ],
-    "sns_3": [
-        ("김태린", "신인 그룹 티저 반응이 좋으면 엔터 쪽 기대감은 생기겠다."),
-        ("박선유", "조회수만으로 흥행을 확신할 수는 없지 않을까?"),
-        ("이예나", "팬덤이 실제 앨범이나 공연 소비로 이어지는지가 중요할 듯."),
-        ("정하영", "금융주는 금리랑 연체율을 같이 봐야 해서 단순하게 판단하기 어렵겠어."),
-        ("박수현", "한쪽은 신인 데뷔 기대감, 한쪽은 금융 불안 소문이네."),
-        ("김나윤", "서로 다른 산업이라 각자 근거를 따져보는 게 좋겠어."),
-        ("박경민", "나는 공식 일정이나 실적 자료가 나올 때까지 기다려볼래."),
-        ("손예원", "SNS 반응이 뜨거워도 투자 판단은 따로 해야 한다는 거지ㅋㅋ"),
-    ],
-    "sns_4": [
-        ("유예나", "정부 지원금 소식이면 소재 기업에는 분명 관심이 쏠릴 만하네."),
-        ("곽이안", "지원 대상이 모든 기업인지 특정 기술 분야인지부터 확인해야 해."),
-        ("안민영", "정책 발표 전에 기대감만으로 움직이는 경우도 많더라."),
-        ("박효찬", "지원 규모가 실제 기업 매출에 얼마나 영향을 줄지도 중요하지."),
-        ("이진우", "공식 보도자료가 있는지 찾아보는 게 먼저일 듯."),
-        ("신재민", "재료산업은 원자재 가격도 변수라서 정책 하나만 보면 안 돼."),
-        ("이서영", "그래도 신소재 분야가 주목받는 계기는 될 수는 있겠다."),
-        ("이시우", "확인 전까지는 가능성 정도로만 생각하는 게 맞겠어."),
-    ],
+# SNS 댓글 닉네임·공통 댓글 재료 (매번 다른 사람, 다른 말투가 나오도록)
+NICK_A = ["존버", "떡상", "개미", "단타", "물린", "눈치", "익명", "새벽", "치킨", "라면", "커피", "야근", "월급", "소액"]
+NICK_B = ["러", "왕", "장인", "요정", "지망생", "대장", "수집가", "연구소", "도사", "집사", "청년", "부장"]
+GENERIC_REPLIES = {
+    "pro": ["{n} 이거 느낌 온다. 나는 간다", "{n} 슬슬 움직일 타이밍 아님?", "{n} 얘기 나올 줄 알았음"],
+    "con": ["{n}? 개미 꼬시는 글 냄새남", "출처가 어디임? 캡처만 보고는 못 믿겠는데", "이런 글 믿고 샀다가 물린 사람 한둘이 아님"],
+    "joke": ["이 글 보고 사면 꼭 고점이더라 ㅋㅋ", "소문은 소문일 뿐 지갑은 소중하다", "나만 구경만 하다 막차 타는 거냐"],
+    "ask": ["혹시 이거 공식 발표 난 거 있음?", "누가 정리 좀 해줘요 ㅠㅠ", "진짜면 지금 사야 하나요?"],
 }
-
-for i, scenario in enumerate([s for s in SCENARIOS if s["kind"] == "sns"], start=1):
-    scenario["comments"] = SNS_COMMENTS[f"sns_{i}"]
+POST_TIMES = ["방금 전", "2분 전", "7분 전", "12분 전", "31분 전"]
 
 UP_REASONS = ["뚜렷한 이유 없이 매수세가 몰렸습니다.", "시장 분위기가 좋아지며 소폭 상승했습니다.",
               "큰 뉴스는 없었지만 투자자들의 기대감이 올랐습니다."]
@@ -252,7 +348,7 @@ def new_room(code, host_id):
         "prices": {k: START_PRICE for k in STOCKS},
         "history": {k: [START_PRICE] for k in STOCKS},
         "round": 0, "current": None, "upcoming": None, "order": [],
-        "timer_end": 0.0, "result": [], "mini_misses": 0,
+        "timer_end": 0.0, "result": [], "mini_misses": 0, "deck": {},
     }
 
 
@@ -268,8 +364,19 @@ def total_value(room, p):
 # ─────────────────────────────────────────────
 # 게임 로직
 # ─────────────────────────────────────────────
-def _rand_step_amount(lo, hi, step=1_000):
+def _rand_step_amount(lo, hi, step=PRICE_STEP):
     return random.randrange(lo, hi + 1, step)
+
+
+def _fix_delta(delta, fallback_sign):
+    """합쳐진 변동 금액을 규칙(상승 3만~20만 / 하락 3만~10만, 1000원 단위)에 맞춘다."""
+    if delta == 0:
+        delta = fallback_sign * PRICE_UP_MIN
+    if delta > 0:
+        delta = max(PRICE_UP_MIN, min(PRICE_UP_MAX, delta))
+    else:
+        delta = -max(PRICE_DOWN_MIN, min(PRICE_DOWN_MAX, -delta))
+    return int(round(delta / PRICE_STEP)) * PRICE_STEP
 
 
 def build_outcome(scenarios):
@@ -301,34 +408,96 @@ def build_outcome(scenarios):
             reason = scn["true_reason"] if is_true else scn["fake_reason"]
             if k in changes:
                 old_delta, old_reason = changes[k]
-                combined = max(-MAX_PRICE_DOWN, min(MAX_PRICE_UP, old_delta + delta_amount))
-                changes[k] = (combined, old_reason + " / " + reason)
+                dominant = old_delta if abs(old_delta) >= abs(delta_amount) else delta_amount
+                combined = _fix_delta(old_delta + delta_amount, 1 if dominant > 0 else -1)
+                changes[k] = (combined, old_reason if abs(old_delta) >= abs(delta_amount) else reason)
             else:
-                changes[k] = (delta_amount, reason)
+                changes[k] = (_fix_delta(delta_amount, final_dir), reason)
 
-    target = min(4, max(len(changes), random.choice([2, 3, 3, 3, 3, 4])))
+    # 오르는 종목 / 내리는 종목이 각각 최소 개수가 되도록 부족한 쪽을 채운다
     others = [k for k in STOCKS if k not in changes]
     random.shuffle(others)
-    while len(changes) < target and others:
+
+    def add_extra(up):
         k = others.pop()
-        up = random.random() < 0.5
         if up:
-            delta_amount = _rand_step_amount(10_000, 60_000)
+            amount = _rand_step_amount(PRICE_UP_MIN, 80_000)
         else:
-            delta_amount = -_rand_step_amount(10_000, 50_000)
-        changes[k] = (delta_amount, random.choice(UP_REASONS if up else DOWN_REASONS))
+            amount = -_rand_step_amount(PRICE_DOWN_MIN, 70_000)
+        changes[k] = (amount, random.choice(UP_REASONS if up else DOWN_REASONS))
+
+    ups = sum(1 for d, _ in changes.values() if d > 0)
+    downs = sum(1 for d, _ in changes.values() if d < 0)
+    while ups < MIN_RISING_STOCKS and others:
+        add_extra(True)
+        ups += 1
+    while downs < MIN_FALLING_STOCKS and others:
+        add_extra(False)
+        downs += 1
     return changes, verdicts
+
+
+def _nick(used):
+    for _ in range(30):
+        n = random.choice(NICK_A) + random.choice(NICK_B) + str(random.randint(1, 99))
+        if n not in used:
+            used.add(n)
+            return n
+    return "누리꾼" + str(random.randint(100, 999))
+
+
+def _reply_likes():
+    return min(5000, int(random.expovariate(1 / 90)) + random.randint(0, 25))
+
+
+def build_sns_thread(scn):
+    """SNS 한 건을 '게시글 + 댓글 4~6개'로 만든다. 댓글 구성·순서·닉네임·좋아요가 매번 달라진다."""
+    pool = list(scn["replies"])
+    pros = [r for r in pool if r[0] == "pro"]
+    cons = [r for r in pool if r[0] == "con"]
+    picked = []
+    if pros:
+        picked.append(random.choice(pros))
+    if cons:
+        picked.append(random.choice(cons))
+    rest = [r for r in pool if r not in picked]
+    random.shuffle(rest)
+    total = random.choice([4, 5, 6])
+    picked += rest[:max(0, total - len(picked) - 1)]
+    stance = random.choice(["pro", "con", "joke", "ask"])
+    stock_name = STOCKS[random.choice(list(scn["effects"]))]["name"]
+    picked.append((stance, random.choice(GENERIC_REPLIES[stance]).format(n=stock_name)))
+    random.shuffle(picked)
+
+    used = set()
+    author = _nick(used)
+    replies = [{"nick": _nick(used), "text": text, "likes": _reply_likes()} for _, text in picked]
+    return {
+        "platform": scn["platform"],
+        "author": author,
+        "time": random.choice(POST_TIMES),
+        "likes": random.randint(300, 9999),
+        "shares": random.randint(20, 900),
+        "replies": replies,
+    }
+
+
+def _pick_scenario(room, kind):
+    """같은 종류의 소식이 한 바퀴 돌 때까지 겹치지 않게 뽑는다."""
+    deck = room.setdefault("deck", {})
+    if not deck.get(kind):
+        pool = [i for i, s in enumerate(SCENARIOS) if s["kind"] == kind]
+        random.shuffle(pool)
+        deck[kind] = pool
+    return SCENARIOS[deck[kind].pop()]
 
 
 def draw(room):
     selected = []
     for kind in ("headline", "special", "sns"):
-        scn = dict(random.choice([s for s in SCENARIOS if s["kind"] == kind]))
+        scn = dict(_pick_scenario(room, kind))
         if kind == "sns":
-            all_c = _normalise_comments(scn.get("comments", []))
-            if all_c:
-                cnt = random.choice([2, 3])
-                scn["sampled_comments"] = random.sample(all_c, min(cnt, len(all_c)))
+            scn["thread"] = build_sns_thread(scn)
         selected.append(scn)
     changes, verdicts = build_outcome(selected)
     return {
@@ -576,34 +745,6 @@ def fmt_delta(diff):
     return "0원 (-)"
 
 
-def _normalise_comments(raw_comments):
-    if not raw_comments:
-        return []
-    if isinstance(raw_comments, dict):
-        raw_items = list(raw_comments.items())
-    elif isinstance(raw_comments, (list, tuple)):
-        raw_items = list(raw_comments)
-    else:
-        raw_items = [raw_comments]
-
-    normalised = []
-    for item in raw_items:
-        if isinstance(item, dict):
-            speaker = item.get("speaker") or item.get("name") or "누리꾼"
-            comment = item.get("comment") or item.get("text") or ""
-        elif isinstance(item, (list, tuple)):
-            if len(item) >= 2:
-                speaker, comment = item[0], item[1]
-            elif len(item) == 1:
-                speaker, comment = "누리꾼", item[0]
-            else:
-                continue
-        else:
-            speaker, comment = "누리꾼", item
-        normalised.append((str(speaker), str(comment)))
-    return normalised
-
-
 def newspaper(articles):
     if isinstance(articles, dict):
         articles = articles.get("articles") or [articles]
@@ -640,20 +781,17 @@ def newspaper(articles):
                 st.info("특보가 없습니다.")
 
             if sns_scn:
+                thread = sns_scn.get("thread")
                 with st.container(border=True):
-                    st.caption("💬 SNS 누리꾼 대화")
+                    platform = thread["platform"] if thread else "SNS"
+                    st.caption(f"💬 SNS 누리꾼 대화 · {platform}")
                     st.markdown(f"**{sns_scn.get('title', '')}**")
                     st.write(sns_scn.get('body', ''))
-
-                    comments = sns_scn.get("sampled_comments")
-                    if comments is None:
-                        all_c = _normalise_comments(sns_scn.get("comments", []))
-                        comments = random.sample(all_c, min(random.choice([2, 3]), len(all_c))) if all_c else []
-
-                    if comments:
+                    if thread:
+                        st.caption(f"👤 {thread['author']} · {thread['time']} · ❤️ {thread['likes']:,} · 🔁 {thread['shares']:,}")
                         st.markdown("---")
-                        for speaker, comment in comments:
-                            st.markdown(f"💬 **{speaker}**: {comment}")
+                        for r in thread["replies"]:
+                            st.markdown(f"💬 **{r['nick']}** · ❤️ {r['likes']:,}  \n{r['text']}")
             else:
                 st.info("SNS 대화가 없습니다.")
 
@@ -732,7 +870,8 @@ def show_player_holdings(room, player):
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
-def show_result(room):
+def show_result(room, show_verdicts=False):
+    """show_verdicts=True 이면 소식 진위 판명 표를 함께 보여준다 (진행자 전용)."""
     changed = {r["key"]: r for r in room["result"]}
     rows = []
     for k, info in STOCKS.items():
@@ -758,8 +897,8 @@ def show_result(room):
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
     verdicts = room.get("last_verdicts", [])
-    if verdicts:
-        st.markdown("#### 🔍 이번 라운드 소식 진위 판명 결과")
+    if show_verdicts and verdicts:
+        st.markdown("#### 🔐 진행자 전용 · 이번 라운드 소식 진위 판명 결과")
         v_rows = []
         for v in verdicts:
             v_rows.append({
@@ -769,6 +908,7 @@ def show_result(room):
                 "실제 진위 여부": "⭕ 사실 (진짜 뉴스)" if v["is_true"] else "❌ 거짓 (가짜/루머)",
             })
         st.dataframe(pd.DataFrame(v_rows), hide_index=True, use_container_width=True)
+        st.caption("진위 판명 결과는 진행자 화면에만 표시됩니다.")
 
 
 def market(room, pid, tradable):
@@ -797,7 +937,7 @@ def market(room, pid, tradable):
                     "수량", min_value=1, value=1, step=1,
                     key=f"qty_{side}_{k}", label_visibility="collapsed"
                 )
-                
+
                 if side == "buy":
                     max_buy_qty = p["cash"] // price if price > 0 else 0
                     q_cols[1].button(
@@ -993,7 +1133,7 @@ def live():
                     st.caption(f"거래 완료: {done} / {len(room['players'])}팀")
                     show_host_round_preview(room)
             if status in ("result", "minigame"):
-                show_result(room)
+                show_result(room, show_verdicts=(role == "host"))
                 if status == "minigame":
                     show_minigame_status_board(room)
             if role == "spectator" and status == "trading":
@@ -1018,7 +1158,7 @@ def live():
                 st.button("✅ 주식 사고 팔기 완료", on_click=cb_done, args=(room, pid),
                           type="primary", disabled=me["done"])
             else:
-                show_result(room)
+                show_result(room, show_verdicts=False)
                 if status == "minigame":
                     st.markdown("#### 🎲 미니게임")
                     q = me["quiz"]
