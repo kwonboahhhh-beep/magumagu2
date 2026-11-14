@@ -3,6 +3,7 @@ import string
 import threading
 import time
 import uuid
+from html import escape
 
 import pandas as pd
 import streamlit as st
@@ -1039,6 +1040,39 @@ def show_host_round_preview(room):
         st.caption("이 정보는 진행자 화면에만 표시되며 참가자와 관전자에게는 공개되지 않습니다.")
 
 
+def show_podium(ranking):
+    """1~3위는 단상으로, 나머지는 표로 보여준다."""
+    spec = {0: ("🥇", "#f5c542", 200, "1위"),
+            1: ("🥈", "#c0c7d1", 150, "2위"),
+            2: ("🥉", "#cd8b4e", 110, "3위")}
+    cols = []
+    for idx in (1, 0, 2):  # 화면 배치: 2위 | 1위 | 3위
+        if idx >= len(ranking):
+            cols.append('<div style="flex:1"></div>')
+            continue
+        medal, color, height, label = spec[idx]
+        p = ranking[idx]
+        cols.append(
+            '<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">'
+            f'<div style="font-size:2.2rem;line-height:1.2">{medal}</div>'
+            f'<div style="font-weight:700;font-size:1.15rem;text-align:center;word-break:keep-all">{escape(p["name"])}</div>'
+            f'<div style="font-size:0.9rem;margin-bottom:8px">{fmt(p["cash"])}</div>'
+            f'<div style="width:100%;height:{height}px;background:{color};border-radius:12px 12px 0 0;'
+            'display:flex;align-items:flex-start;justify-content:center;padding-top:10px;'
+            f'font-size:1.6rem;font-weight:800;color:#222">{label}</div></div>'
+        )
+    markup = ('<div style="display:flex;gap:12px;align-items:flex-end;max-width:680px;margin:20px auto 8px;">'
+              + "".join(cols) + "</div>")
+    st.markdown(markup, unsafe_allow_html=True)
+
+    rest = ranking[3:]
+    if rest:
+        st.markdown("#### 4위 이하")
+        rows = [{"순위": f"{i}위", "팀": p["name"], "최종 현금": fmt(p["cash"])}
+                for i, p in enumerate(rest, start=4)]
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+
 def host_panel(room):
     status = room["status"]
     st.divider()
@@ -1142,12 +1176,11 @@ def live():
     elif status == "final":
         st.subheader("🏆 최종 결과")
         ranking = sorted(room["players"].values(), key=lambda p: p["cash"], reverse=True)
-        medals = ["🥇", "🥈", "🥉"]
-        rows = [{"순위": medals[i] if i < 3 else str(i + 1), "팀": p["name"], "최종 현금": fmt(p["cash"])}
-                for i, p in enumerate(ranking)]
         if ranking:
             st.success(f"우승: {ranking[0]['name']} 팀!")
-        st.dataframe(pd.DataFrame(rows), hide_index=True)
+            show_podium(ranking)
+        else:
+            st.info("참가한 팀이 없어요.")
 
     # ── 진행 중(매매 / 결과 / 미니게임) ──
     else:
