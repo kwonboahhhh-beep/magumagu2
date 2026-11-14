@@ -30,6 +30,7 @@ MINIGAME_CHANCE = 0.3       # 라운드 사이 미니게임 확률
 MINIGAME_FORCE_AFTER = 4    # 4번 연속 안 나오면 5번째에는 반드시 발생
 FALSE_HINT_RATE = 0.1       # 힌트가 거짓일 확률
 POLL_SECONDS = 2            # 화면 자동 새로고침 주기
+SNS_REPLY_COUNT = 3         # SNS 댓글 개수
 
 # 종목 이름은 여기서만 바꾸면 됩니다
 STOCKS = {
@@ -348,7 +349,7 @@ def new_room(code, host_id):
         "prices": {k: START_PRICE for k in STOCKS},
         "history": {k: [START_PRICE] for k in STOCKS},
         "round": 0, "current": None, "upcoming": None, "order": [],
-        "timer_end": 0.0, "result": [], "mini_misses": 0, "deck": {},
+        "timer_end": 0.0, "timer_started": False, "result": [], "mini_misses": 0, "deck": {},
     }
 
 
@@ -461,11 +462,14 @@ def build_sns_thread(scn):
         picked.append(random.choice(cons))
     rest = [r for r in pool if r not in picked]
     random.shuffle(rest)
-    total = random.choice([4, 5, 6])
-    picked += rest[:max(0, total - len(picked) - 1)]
-    stance = random.choice(["pro", "con", "joke", "ask"])
-    stock_name = STOCKS[random.choice(list(scn["effects"]))]["name"]
-    picked.append((stance, random.choice(GENERIC_REPLIES[stance]).format(n=stock_name)))
+    need = SNS_REPLY_COUNT - len(picked)
+    if need > 0 and (random.random() < 0.3 or len(rest) < need):
+        stance = random.choice(["pro", "con", "joke", "ask"])
+        stock_name = STOCKS[random.choice(list(scn["effects"]))]["name"]
+        picked.append((stance, random.choice(GENERIC_REPLIES[stance]).format(n=stock_name)))
+        need -= 1
+    picked += rest[:max(0, need)]
+    picked = picked[:SNS_REPLY_COUNT]
     random.shuffle(picked)
 
     used = set()
@@ -514,7 +518,8 @@ def start_round(room):
     for p in room["players"].values():
         p["done"] = False
         p["quiz"] = None
-    room["timer_end"] = time.time() + ROUND_SECONDS
+    room["timer_end"] = 0.0
+    room["timer_started"] = False
     room["status"] = "trading"
 
 
@@ -535,7 +540,7 @@ def resolve(room):
 
 def tick(room):
     with LOCK:
-        if room["status"] == "trading":
+        if room["status"] == "trading" and room.get("timer_started"):
             players = room["players"].values()
             all_done = bool(room["players"]) and all(p["done"] for p in players)
             if all_done or time.time() >= room["timer_end"]:
@@ -656,6 +661,19 @@ def cb_minigame(room):
             start_minigame(room)
 
 
+def cb_start_timer(room):
+    with LOCK:
+        if room["status"] == "trading" and not room.get("timer_started"):
+            room["timer_started"] = True
+            room["timer_end"] = time.time() + ROUND_SECONDS
+
+
+def cb_force_end(room):
+    with LOCK:
+        if room["status"] == "trading":
+            resolve(room)
+
+
 def cb_end_minigame(room):
     with LOCK:
         if room["status"] == "minigame":
@@ -682,7 +700,7 @@ def cb_end_game(room):
 def cb_trade(room, pid, k, side, custom_qty=None):
     with LOCK:
         p = room["players"].get(pid)
-        if room["status"] != "trading" or not p or p["done"]:
+        if room["status"] != "trading" or not room.get("timer_started") or not p or p["done"]:
             st.toast("지금은 거래할 수 없어요.", icon="⛔")
             return
         price = room["prices"][k]
@@ -714,7 +732,7 @@ def cb_trade(room, pid, k, side, custom_qty=None):
 def cb_done(room, pid):
     with LOCK:
         p = room["players"].get(pid)
-        if p and room["status"] == "trading":
+        if p and room["status"] == "trading" and room.get("timer_started"):
             p["done"] = True
 
 
@@ -808,7 +826,10 @@ def players_df(room, status, spectator_view=False):
             row["총 자산"] = fmt(total_value(room, p))
 
         if status == "trading":
-            row["상태"] = "✅ 완료" if p["done"] else "⏳ 거래 중"
+            if not room.get("timer_started"):
+                row["상태"] = "📖 소식 읽는 중"
+            else:
+                row["상태"] = "✅ 완료" if p["done"] else "⏳ 거래 중"
         elif status == "result":
             row["상태"] = "라운드 종료"
         elif status == "minigame":
@@ -829,7 +850,7 @@ def players_df(room, status, spectator_view=False):
 def spectator_progress_df(room):
     return pd.DataFrame([
         {"참가 팀": player["name"],
-         "거래 상태": "✅ 주식 사고팔기 완료" if player["done"] else "⏳ 거래 진행 중"}
+         "거래 상태": ("📖 소식 읽는 중" if not room.get("timer_started") else ("✅ 주식 사고팔기 완료" if player["done"] else "⏳ 거래 진행 중"))}
         for player in room["players"].values()
     ])
 
@@ -869,8 +890,9 @@ def show_player_holdings(room, player):
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
-def show_result(room, show_verdicts=False):
-    """show_verdicts=True 이면 소식 진위 판명 표를 함께 보여준다 (진행자 전용)."""
+def show_result(room, show_verdicts=False, show_prob=True):
+    """show_verdicts=True 이면 소식 진위 판명 표를 보여준다 (진행자·관전자 전용).
+    show_prob=False 이면 '사실일 확률' 열을 숨긴다 (관전자용)."""
     changed = {r["key"]: r for r in room["result"]}
     rows = []
     for k, info in STOCKS.items():
@@ -897,17 +919,16 @@ def show_result(room, show_verdicts=False):
 
     verdicts = room.get("last_verdicts", [])
     if show_verdicts and verdicts:
-        st.markdown("#### 🔐 진행자 전용 · 이번 라운드 소식 진위 판명 결과")
+        st.markdown("#### 🔍 이번 라운드 소식 진위 판명 결과")
         v_rows = []
         for v in verdicts:
-            v_rows.append({
-                "구분": v["label"],
-                "소식 제목": v["title"],
-                "사실일 확률": f"{v['prob']}%",
-                "실제 진위 여부": "⭕ 사실 (진짜 뉴스)" if v["is_true"] else "❌ 거짓 (가짜/루머)",
-            })
+            row = {"구분": v["label"], "소식 제목": v["title"]}
+            if show_prob:
+                row["사실일 확률"] = f"{v['prob']}%"
+            row["실제 진위 여부"] = "⭕ 사실 (진짜 뉴스)" if v["is_true"] else "❌ 거짓 (가짜/루머)"
+            v_rows.append(row)
         st.dataframe(pd.DataFrame(v_rows), hide_index=True, use_container_width=True)
-        st.caption("진위 판명 결과는 진행자 화면에만 표시됩니다.")
+        st.caption("진위 판명 결과는 진행자와 관전자만 볼 수 있어요." if show_prob else "진위 판명 결과는 관전자와 진행자에게만 공개돼요.")
 
 
 def market(room, pid, tradable):
@@ -1033,6 +1054,11 @@ def host_panel(room):
         c2.button("🎲 미니게임 실시", on_click=cb_minigame, args=(room,))
     elif status == "minigame":
         st.button("⏭️ 미니게임 종료 · 다음 라운드 시작", on_click=cb_end_minigame, args=(room,), type="primary")
+    elif status == "trading":
+        if not room.get("timer_started"):
+            st.button(f"⏱️ {ROUND_SECONDS // 60}분 타이머 시작", on_click=cb_start_timer, args=(room,), type="primary")
+            st.caption("신문을 다 읽은 뒤 누르면 참가자들의 거래가 열려요.")
+        st.button("⏹️ 이번 라운드 종료 (결과 공개)", on_click=cb_force_end, args=(room,))
     if status in ("result", "minigame") and room["players"]:
         c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
         c1.selectbox("힌트권을 줄 팀", list(room["players"].keys()), key="grant_pid",
@@ -1094,8 +1120,11 @@ def live():
     if room["round"] > 0 and status != "final":
         st.subheader(f"라운드 {room['round']}")
     if status == "trading":
-        remain = max(0, int(room["timer_end"] - time.time()))
-        st.progress(remain / ROUND_SECONDS, text=f"⏱️ 남은 시간 {remain // 60:02d}:{remain % 60:02d}")
+        if room.get("timer_started"):
+            remain = max(0, int(room["timer_end"] - time.time()))
+            st.progress(remain / ROUND_SECONDS, text=f"⏱️ 남은 시간 {remain // 60:02d}:{remain % 60:02d}")
+        else:
+            st.info("📖 소식을 읽는 중이에요. 진행자가 타이머를 시작하면 거래할 수 있어요.")
 
     # ── 대기방 ──
     if status == "lobby":
@@ -1132,7 +1161,7 @@ def live():
                     st.caption(f"거래 완료: {done} / {len(room['players'])}팀")
                     show_host_round_preview(room)
             if status in ("result", "minigame"):
-                show_result(room, show_verdicts=(role == "host"))
+                show_result(room, show_verdicts=True, show_prob=(role == "host"))
                 if status == "minigame":
                     show_minigame_status_board(room)
             if role == "spectator" and status == "trading":
@@ -1153,9 +1182,10 @@ def live():
             if status == "trading":
                 if me["done"]:
                     st.success("거래를 완료했어요. 다른 팀을 기다리는 중...")
-                market(room, pid, tradable=not me["done"])
+                started = bool(room.get("timer_started"))
+                market(room, pid, tradable=started and not me["done"])
                 st.button("✅ 주식 사고 팔기 완료", on_click=cb_done, args=(room, pid),
-                          type="primary", disabled=me["done"])
+                          type="primary", disabled=me["done"] or not started)
             else:
                 show_result(room, show_verdicts=False)
                 if status == "minigame":
